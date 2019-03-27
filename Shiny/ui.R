@@ -48,7 +48,7 @@ plot.time.series <- function(df, x.axis, y.axis, colour = "blue", colour.legend 
   
 }
 # Read the data
-setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Shiny")
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/Shiny")
 Kanyama <- read.csv("Shiny_plot.csv", stringsAsFactors = F)
 
 # All in one ----

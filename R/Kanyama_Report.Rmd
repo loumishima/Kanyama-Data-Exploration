@@ -1,0 +1,1010 @@
+---
+title: "Kanyama Analysis"
+author: "Luiz Henrique"
+date: "07/03/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gather3/Documents/Kanyama - Data Exploration/Data")
+
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(plotly)
+```
+
+## Data Introduction
+
+This document provides an data analysis of the data sent by WSUP of the Kanyama's toilet avaliation, it is included in this document data cleaning, organizing and visualization.
+
+
+```{r cars, message=F, warning=F}
+Kanyama.raw <- read_xlsx("KANYAMA.xlsx", sheet = 2, skip = 1)
+Kanyama <- Kanyama.raw %>% select(-c(1:23, 27)) %>% filter(.$`Are you willing to participate?` == "Yes")
+str(Kanyama.raw)
+```
+
+The first observation is that there are a lot of attributes and most of them are just special cases when the interviewee has a very specific answer, making new columns for just a small part of the dataset, complete the majority of answers with NA's.
+
+The first operation made was to remove any personal identification (e.g.: _Landlord name_, _Interviewee name_, _enumerator name_ ), and remove any row that the person who was interviewed declined to answer the form, since all atributes are NA's after the question to participate.
+
+
+## Renaming Variables
+
+It was necessary to rename some of the columns becase the attributes are subitens inside the question (e.g.: Record GPS is a question that is composed by multiple columns, like Latitude, Logitude, etc.), and their names are just numerical identifiers or too confusing to link with what they represent.
+
+
+
+```{r rename}
+Kanyama <- Kanyama %>% rename("Record_plot_number" = `1.3`,
+                                  "Families_on_the_plot" = `1.4`,
+                                  "People_on_the_plot" = `1.5`,
+                                  "VIP toilets" = `1.6 - 1 - 1.5.1`,
+                                  "ECOSAN toilets" = `1.6 - 2 - 1.5.1`,
+                                  "Inside waterflush toilets" = `1.6 - 3 - 1.5.1`,
+                                  "Outside waterflush toilets" = `1.6 - 4 - 1.5.1`,
+                                  "Poor flush Inside" = `1.6 - 5 - 1.5.1`,
+                                  "Poor flush Outside" = `1.6 - 6 - 1.5.1`,
+                                  "Lined Pit latrine" = `1.6 - 7 - 1.5.1`,
+                                  "Unlined Pit latrine" = `1.6 - 8 - 1.5.1`,
+                                  "Disused/Buried" = `1.6 - 9 - 1.5.1`,
+                                  "Water source (fetch)" = `1.6.2`,
+                                  "Emptied the toilet before?" = `3.7`,
+                                  "Last time emptied" = `3.7.1`,
+                                  "Who emptied?" = `3.7.2`,
+                                  "Interface Layout" = `4.3 INTERFACE`,
+                                  "Width" = `4.4`,
+                                  "Diameter" = `4.416`,
+                                  "Length" = `4.5`,
+                                  "Height" = `4.6`,
+                                  "Perception of the fill level" = `4.7`,
+                                  "Is emptying feasible?" = `4.8`,
+                                  "Is washing hand basin present?" = `4.9`,
+                                  "Region" = `1.2`,
+                                  "Landlord live in the plot?" = `1.8`,
+                                  "Upgraded toilet recently?" = `3.4`
+                                  )
+```
+
+
+##Removing unused variables
+
+One operation to start getting the standard dataset is to start removing the attributes that are not used for most algorithms, these are most too specific to be used in a generalization process.
+
+Another operation realized was the one to consider only rows that has just one toilet, because the cases with two or more are going to be treated afterwards.
+```{r select}
+
+simplify <- function(df){
+  df.reduced <- df %>% 
+    select(-starts_with("DESCRIPTION OF RESPONDENT:"),
+           -starts_with("SELECT ZONE (Other"), 
+           -starts_with("SELECT ZONE SECTION (Other"),
+           -`RECORD TYPE OF PROPERTY (Other (please specify)) - specify`,
+           - `1.3 (Don't Know)`,
+           - `1.5 (Don't Know)`,
+           -`1.6.1 Do you think there is space on this plot to construct another toilet?: No - If Yes how many more? If No, why is that the case?`,
+           -`1.6.2 (Other (please specify)) - specify`,
+           -`1.7`,
+           -`1.7.1`,
+           -`2.1D`,
+           -`What is the designation of the respondent?`,
+           -`3.4 (Don't Know)`,
+           -starts_with("3.5"),
+           -starts_with("What do you want to upgrade your toilet"),
+           -starts_with("What happens when the toilet gets full? (Other"),
+           -ends_with("Months - Age"),
+           -`3.7 (Other (please specify)) - specify`,
+           -starts_with("3.7.1 ("),
+           -starts_with("How did you know about the service of emptying your toilet"),
+           -starts_with("How would you rate your level of satisfaction with the service you received from the emptiers?" ),
+           -starts_with("3.7.3"),
+           -starts_with("Was the fee you paid affordable? (" ),
+           -starts_with("How often do you empty your toilet? ("),
+           -starts_with("3.8"),
+           -starts_with("4.1"),
+           -starts_with("4.2"),
+           -starts_with("4.3 SLAB"),
+           -starts_with("4.3 INTERFACE ("),
+           -starts_with("CONTAINMENT/SUBSTRUCTURE ("),
+           -starts_with("Record the observed shape of the substructure/containment  ("),
+           -starts_with("TAKE PHOTO OF"),
+           -starts_with("TAKE  PHOTO OF"),
+           -starts_with("4.8 (Don't Know)")
+           
+    )
+  
+  if(any(df.reduced$`Is there another toilet to observe` == "No")){
+    
+    index <- grep("Is there another", colnames(df.reduced)) + 1
+    df.reduced <- select(df.reduced, -c(index:ncol(df.reduced)))
+  }
+  
+  return(df.reduced)
+}
+
+Kanyama.reduced <- simplify(Kanyama)
+
+summary(Kanyama.reduced)
+```
+
+##Grouping columns
+
+Some attributes can be unified into a one single column, this happens because some info are splitted into 'Yes and No' and for these two columns exists a boolean indicating 'True or False', this can be transformed into a single columns where 'False' is equals to 'No' and 'True' is equals to 'Yes', it was made a function to do that process automaticaly, following a pattern.
+
+```{r grouping-function}
+
+grouping.columns <- function(df, column1, column2, name){
+ 
+  res <- select(df, -starts_with(name)) 
+  mutate(res, !!name := case_when(
+    column1 == T ~ T,
+    column1 != T & column2 == T ~ F,
+    TRUE ~ NA))
+  
+}
+
+```
+
+
+###Grouping the Children acessible toilets
+
+```{r children}
+
+Kanyama.reduced <- grouping.columns(Kanyama.reduced,
+                 Kanyama.reduced$`Is the toilet easily accessible to the following people?: Children - Yes`,
+                 Kanyama.reduced$`Is the toilet easily accessible to the following people?: Children - No`,
+                 "Is the toilet easily accessible to the following people?: Children")
+
+```
+
+
+###Grouping the persons with dissability acessible toilets
+
+
+```{r dissability}
+
+Kanyama.reduced <- grouping.columns(Kanyama.reduced,
+                                Kanyama.reduced$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes`, 
+                                Kanyama.reduced$`Is the toilet easily accessible to the following people?: Persons with dissability - No`,
+                                "Is the toilet easily accessible to the following people?: Persons with dissability")
+
+
+```
+
+
+###Grouping the women at night acessible toilets
+
+```{r women}
+
+Kanyama.reduced <- grouping.columns(Kanyama.reduced,
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following people?: Women at night - Yes`, 
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following people?: Women at night - No`,
+                                    "Is the toilet easily accessible to the following people?: Women at night")
+
+
+```
+
+
+###Grouping the Vacuum tanker acessible toilets
+
+
+```{r Vacuum}
+
+Kanyama.reduced <- grouping.columns(Kanyama.reduced,
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes`, 
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No`,
+                                    "Is the toilet easily accessible to the following?: Vacuum Tanker")
+
+```
+
+
+###Grouping the Light truck acessible toilets
+
+```{r Truck}
+
+Kanyama.reduced <- grouping.columns(Kanyama.reduced,
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Light Truck - Yes` , 
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Light Truck - No`,
+                                    "Is the toilet easily accessible to the following?: Light Truck")
+
+
+```
+
+###Grouping the Push Cart acessible toilets
+
+```{r Cart}
+
+Kanyama.reduced <- grouping.columns(Kanyama.reduced,
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Push Cart - Yes`, 
+                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Push Cart - No`,
+                                    "Is the toilet easily accessible to the following?: Push Cart")
+
+
+```
+
+
+###Removing the multiple toilet column
+
+The chunk below remove the multiple column question, because the simplify function filters the dataset to only single toilet rows
+
+```{r single}
+
+Kanyama.reduced <- select(Kanyama.reduced, -`Is there another toilet to observe`)
+
+```
+
+##Solving the multiple toilets problem
+
+Some observations have more than one toilet observed at the same time, making the form to repeat the questions to any other toilet analyzed. This exception will extend the number of columns on the dataset, even if the majority is formed by single toilet forms. To solve this problem is necessary to separate the cases with multiple toilets and make new rows with them, expanding vertically instead of horizontaly.
+
+
+###Selecting the rows with two and three toilets
+```{r select-multiple}
+
+more.than.1.toilet <- Kanyama %>% filter(`Is there another toilet to observe` == "Yes")
+more.than.2.toilet <- Kanyama %>% filter(`Is there a third toilet to observe` == "Yes")
+
+```
+
+###Treating the 2 toilets case
+
+The process is resumed as:
+
+1. It is removed the columns in the same way as the single toilet rows
+2. A search for the columns related to the second toilet is made, finding the beggining and end columns
+3. It is created new rows for the second toilets (the first case was already treated before)
+4. The 'Yes or No' columns are treated just like on the single toilet case
+5. Column asking about the third toilet is removed
+
+```{r 2-toiet}
+
+more.than.1.toilet <- simplify(more.than.1.toilet)
+
+index_beg <- grep("Is there another", colnames(more.than.1.toilet))
+index_end <- grep("Is there a third", colnames(more.than.1.toilet))
+index_sub <- grep("Inter", colnames(more.than.1.toilet))
+
+test1 <- more.than.1.toilet[, 1:55]
+test2 <- more.than.1.toilet[,87:117]
+test3 <- cbind(test1,test2)
+
+test3 <- grouping.columns(test3,
+                                    test3$`Is the toilet easily accessible to the following people?: Children - Yes61`,
+                                    test3$`Is the toilet easily accessible to the following people?: Children - No62`,
+                                    "Is the toilet easily accessible to the following people?: Children")
+
+test3 <- grouping.columns(test3,
+                                    test3$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes59`, 
+                                    test3$`Is the toilet easily accessible to the following people?: Persons with dissability - No60`,
+                                    "Is the toilet easily accessible to the following people?: Persons with dissability")
+
+test3 <- grouping.columns(test3,
+                                    test3$`Is the toilet easily accessible to the following people?: Women at night - Yes63`, 
+                                    test3$`Is the toilet easily accessible to the following people?: Women at night - No64`,
+                                    "Is the toilet easily accessible to the following people?: Women at night")
+
+test3 <- grouping.columns(test3,
+                                    test3$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes53`, 
+                                    test3$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No54`,
+                                    "Is the toilet easily accessible to the following?: Vacuum Tanker")
+
+test3 <- grouping.columns(test3,
+                                    test3$`Is the toilet easily accessible to the following?: Light Truck - Yes55` , 
+                                    test3$`Is the toilet easily accessible to the following?: Light Truck - No56`,
+                                    "Is the toilet easily accessible to the following?: Light Truck")
+
+test3 <- grouping.columns(test3,
+                                    test3$`Is the toilet easily accessible to the following?: Push Cart - Yes57`, 
+                                    test3$`Is the toilet easily accessible to the following?: Push Cart - No58`,
+                                    "Is the toilet easily accessible to the following?: Push Cart")
+rm(test1,test2)
+test3 <- select(test3, -`Is there a third toilet to observe`)
+
+
+```
+
+###Treating the 3 toilets case
+
+The process with 3 toilets is similar to the 2 toilets case, just change the column's index.
+
+```{r 3-toilet}
+
+more.than.2.toilet <- simplify(more.than.2.toilet)
+
+test4 <- more.than.2.toilet[,118:ncol(more.than.2.toilet)]
+test5 <- more.than.2.toilet[,1:55]
+test6 <- cbind(test5,test4)
+
+test6 <- grouping.columns(test6,
+                          test6$`Is the toilet easily accessible to the following people?: Children - Yes109`,
+                          test6$`Is the toilet easily accessible to the following people?: Children - No110`,
+                          "Is the toilet easily accessible to the following people?: Children")
+
+test6 <- grouping.columns(test6,
+                          test6$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes107`, 
+                          test6$`Is the toilet easily accessible to the following people?: Persons with dissability - No108`,
+                          "Is the toilet easily accessible to the following people?: Persons with dissability")
+
+test6 <- grouping.columns(test6,
+                          test6$`Is the toilet easily accessible to the following people?: Women at night - Yes111`, 
+                          test6$`Is the toilet easily accessible to the following people?: Women at night - No112`,
+                          "Is the toilet easily accessible to the following people?: Women at night")
+
+test6 <- grouping.columns(test6,
+                          test6$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes101`, 
+                          test6$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No102`,
+                          "Is the toilet easily accessible to the following?: Vacuum Tanker")
+
+test6 <- grouping.columns(test6,
+                          test6$`Is the toilet easily accessible to the following?: Light Truck - Yes103` , 
+                          test6$`Is the toilet easily accessible to the following?: Light Truck - No104`,
+                          "Is the toilet easily accessible to the following?: Light Truck")
+
+test6 <- grouping.columns(test6,
+                          test6$`Is the toilet easily accessible to the following?: Push Cart - Yes105`, 
+                          test6$`Is the toilet easily accessible to the following?: Push Cart - No106`,
+                          "Is the toilet easily accessible to the following?: Push Cart")
+rm(test4,test5)
+
+
+```
+
+##Uniting the single, 2 and 3 toilet data
+
+The final operation on the data analysis' first stage is to create a single dataset that unifies all the cases above. In the end, a new dataset is created, it is named 'Kanyama_reduced', and it is going to be used for a more fine tuning on the data aspects
+
+
+
+```{r uniting}
+
+names(test3) <- names(Kanyama.reduced)
+names(test6) <- names(Kanyama.reduced)
+
+Kanyama.final <- rbind(Kanyama.reduced, test3, test6)
+
+write.csv(Kanyama.final, file = "Kanyama_reduced.csv", row.names = F)
+
+```
+
+
+#2nd part - Specific filtering and categories organization
+
+
+The second part of this report is focused on doing a more specific cleaning on the dataset, now removing some "non-obvious-removable" attributes, and turning the dataset into a more generic structure.
+
+```{r removing2}
+
+Kanyama <- read.csv("Kanyama_reduced.csv")
+
+Kanyama <- Kanyama %>% select(-c(Are.you.willing.to.participate.,
+                                  Record_plot_number,                             Where.do.you.dispose.your.solid.wastes...Other..please.specify.....specify,
+                                  How.much.did.you.pay.for.the.upgrades.in.ZMW.,
+                                  How.did.you.finance.for.the.upgrades.,                                 How.did.you.finance.for.the.upgrades...Other..please.specify.....specify,
+                                  X3.7.2..Other..please.specify.....specify,
+                                  Condition.of.the.components..Roof...Score.Condition,
+                                  Condition.of.the.components..Wall...Score.Condition,
+                                  Condition.of.the.components..Floor...Score.Condition,
+                                  DATE.OF.INTERVIEW..Time.Answered.
+                                  ))
+
+
+```
+
+The code above reads the csv generated on the report's first part, and removes some attributes that was non-essential for the next steps.
+
+*P.s.: The selection of these categories is based on a personal point of view and any changing is welcoming*
+
+
+##Transforming text answers
+
+
+The next part is to turn some attributes, from a text answer to a categorical answer, helping in plot schemes where a limited number of categories is needed.
+
+### Space for toilets
+The code below, transform any kind of text answer into a 'True' or 'False' approach, if there are some words like "No", "None" or or numbers like '0' it is set a "False" value, else it is set a "True" value.
+
+```{r space-toilet}
+
+Kanyama <- Kanyama %>% mutate(Enough.space.another.toilet = 
+                                case_when(is.na(X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case.) ~ FALSE,
+                                          grepl("No", X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case.) == TRUE ~ FALSE,
+                                          grepl("\\d0", X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case.) == TRUE ~ TRUE,
+                                          grepl("0", X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case.) == TRUE ~ FALSE,
+                                          grepl("None", X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case.) == TRUE ~ FALSE,
+                                          grepl("Zero", X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case.) == TRUE ~ FALSE,
+                                          TRUE ~ TRUE))
+```
+
+###Full toilet aproach
+
+The next chunk of code change the numeric notation to a categorical textual approach and grouping some answers where multiple options were made, again to make easier for the plotting steps.
+
+```{r full}
+
+Kanyama <- Kanyama %>% mutate(What.happens.when.the.toilet.gets.full. =
+                                case_when(What.happens.when.the.toilet.gets.full. == "1" ~ "Bury and dig another one",
+                                          What.happens.when.the.toilet.gets.full. == "2" ~ "Empty and reuse",
+                                          What.happens.when.the.toilet.gets.full. == "3" ~ "Abandone",
+                                          What.happens.when.the.toilet.gets.full. == "Other (please specify)" ~ "Other (please specify)",
+                                          TRUE ~ "Multiple options"))
+
+
+```
+
+###Time needed to empty a toilet
+
+This block of code belows shows the unification of the camps month and year from the question asking about the time to empty the toilet. The new columns is formed in a X.Y structure, where the X is represented by the years and the Y is formed by the months. Also, the dates with NA's where replaced by zeroes (it can be also transformed into NA later)
+
+*P.s.: this transforming need a bit more of treatment for cases like X.10 to X.12 and situations where the answer was all made in months instead of years and months (e.g.: 30 months instead of 2 years and 6 months)*
+
+
+```{r years}
+
+Kanyama <- Kanyama %>% mutate(Toilet.emptying.time = paste(When.next.do.you.think.your.toilet.will.be.due.for.emptying...Years.from.now...Period,
+                                                           When.next.do.you.think.your.toilet.will.be.due.for.emptying...Months.from.now...Period,
+                                                           sep = "."),
+                              Toilet.emptying.time = gsub("NA", "0", Toilet.emptying.time))
+
+
+```
+
+###Interface type
+
+This part transform the numeric info about the toilets into a categorical information and grouping the multiple answer into the "Multiple option" category
+
+```{r Interface}
+Kanyama <- Kanyama %>% mutate(Interface.Layout =
+                                case_when(Interface.Layout == "1" ~ "Sit down toilet with manual (hand) flushing system",
+                                          Interface.Layout == "2" ~ "Sit down toilet with pour (bucket) flushing system",
+                                          Interface.Layout == "3" ~ "Squat with pour (bucket) flushing system",
+                                          Interface.Layout == "4" ~ "Squat hole (Dry toilet)",
+                                          Interface.Layout == "5" ~ "Urine Diversion Toilet",
+                                          Interface.Layout == "6" ~ "Other",
+                                          is.na(Interface.Layout) ~ NA_character_,
+                                          TRUE ~ "Multiple choice"))
+
+
+```
+
+
+
+### People using toilets
+
+The next part treats to unify the people's gender categories (Adult/Male, Adult/Female, Children/Male, Children/Female) to just "Children" and "Adult" categories, and also creating a more general attribute containning just the people who uses the toilet.
+
+
+```{r people}
+
+Kanyama <- Kanyama %>% mutate(adults.using.toilet = rowSums(select(Kanyama, How.many.people.use.the.toilets.on.this.plot...Adults...Female, How.many.people.use.the.toilets.on.this.plot...Adults...Male), na.rm = T),
+                              children.using.toilet = rowSums(select(Kanyama, How.many.people.use.the.toilets.on.this.plot...Children...Male, How.many.people.use.the.toilets.on.this.plot...Children...Female), na.rm = T),
+                              people.using.toilet = rowSums(select(Kanyama, How.many.people.use.the.toilets.on.this.plot...Children...Male, How.many.people.use.the.toilets.on.this.plot...Children...Female, How.many.people.use.the.toilets.on.this.plot...Adults...Male, How.many.people.use.the.toilets.on.this.plot...Adults...Female), na.rm = T))
+
+
+```
+
+###Number of toilets
+
+This chunk just count a total number of toilets, something essential that was missing in the original dataset, of course the individual numbers of each type of toilet is important and can be included at any time.
+
+
+```{r sum_toilet}
+
+Kanyama <- Kanyama %>% mutate(Total.number.of.toilets.0. = rowSums(select(Kanyama, VIP.toilets: Disused.Buried), na.rm = T))
+
+```
+
+Removing more attributes.
+
+```{r removing_again}
+Kanyama <- Kanyama %>% select(-c(X1.6.1.Do.you.think.there.is.space.on.this.plot.to.construct.another.toilet...Yes...If.Yes.how.many.more..If.No..why.is.that.the.case., X1.9..administrative.region.: X1.9..Location.Answered...altitude., Explain.reason.for.not.being.able.to.take.the.reading.of.the.height. ))
+```
+
+###Solid wastes 
+
+It was grouped the answers where multiple options were given, creating the field "Multiple choices".
+
+```{r solid_wastes}
+
+
+Kanyama <- Kanyama %>% mutate(Where.do.you.dispose.your.solid.wastes. = case_when(grepl(",",Where.do.you.dispose.your.solid.wastes.) == TRUE ~ "Multiple Choices",
+                                                                                  Where.do.you.dispose.your.solid.wastes. == "null" ~ NA_character_,
+                                                                                  TRUE ~ as.character(Where.do.you.dispose.your.solid.wastes.)))
+
+```
+
+
+
+##Organizing and saving to a new dataset
+
+The final part is just a dataset organization, putting similar attirbutes next to each other, and saving into a brand new csv file.
+
+```{r final2}
+
+Kanyama_essential <- Kanyama %>% select(c(
+  DATE.OF.INTERVIEW,
+  RECORD.TYPE.OF.PROPERTY,
+  Region,
+  People_on_the_plot,
+  Landlord.live.in.the.plot.,
+  Total.number.of.toilets.0.,
+  Enough.space.another.toilet,
+  Water.source..fetch.,
+  X1.9..latitude.,
+  X1.9..longitude.,
+  adults.using.toilet,
+  children.using.toilet,
+  people.using.toilet,
+  Where.do.you.dispose.your.solid.wastes.,
+  starts_with("Age.of.toilet"),
+  What.happens.when.the.toilet.gets.full.,
+  Toilet.emptying.time,
+  Interface.Layout,
+  CONTAINMENT.SUBSTRUCTURE,
+  Record.the.observed.shape.of.the.substructure.containment.,
+  Width:Height,
+  Perception.of.the.fill.level:Is.the.toilet.easily.accessible.to.the.following...Push.Cart
+))
+
+write.csv(Kanyama, file = "Kanyama_organized.csv", row.names = F)
+write.csv(Kanyama_essential, file = "Kanyama_to_plot.csv", row.names = F)
+
+
+```
+
+
+#3rd part - Visualization
+
+After the whole claning and organizing part, this step shows some results of what can be done with the actual dataset. A more organized dataset helps the data analyst to focus on the visualization and algorithms and avoid the confusion to understand too many attributes, many of them with little or no importance on the final result.
+
+The two datasets created are using depending on what kind of visuazation:
+
+1. *Kanyama.plot*: Is used in cases that the location (Latitude, Longitude) is not used, adding the cases that have NA's in the location.
+
+2. *Kanyama.valid*: Is used when the Location is necessary, ignoring the cases where there is no Latitude or Longitude
+```{r}
+
+Kanyama.plot <- read.csv("Kanyama_to_plot.csv")
+
+Kanyama.valid <- Kanyama.plot %>% filter(!is.na(X1.9..latitude.) & !is.na(X1.9..longitude.)) %>% filter(X1.9..latitude. > -20)
+
+
+```
+
+###Map - Type of toilets
+
+Structure:
+
+1. pal: Colour palletes (each color for a kind of toilet)
+2. label: Way to gather water
+3. dots represent one plot on the map
+4. Type of chart: Map
+
+```{r Map1}
+
+pal <- colorFactor("Accent", domain = Kanyama.valid$Interface.Layout, na.color = "#000000"  )
+
+
+plot <- leaflet(data = Kanyama.valid) %>%
+  addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal(Kanyama.valid$Interface.Layout), label = ~Water.source..fetch.,
+                   radius = 10, fillOpacity = 0.5, stroke = F) %>% addLegend("bottomright", 
+                                              pal = pal, 
+                                              values = ~Interface.Layout,
+                                              title = "Type of toilet", na.label = "Not Available")
+plot
+
+
+
+```
+
+### Percentage of each type of toilet
+
+Structure: 
+
+1. X axis: Type of toilet
+2. Y axis: Percentage of toilets
+3. fill: Type of toilet
+4. Type of chart: Bar
+
+```{r toilet-percentage}
+type.of.toilet <- Kanyama.plot %>% group_by(Interface.Layout) %>% summarise(percentage = round(n()/nrow(Kanyama.plot) * 100, 1), count = n())
+
+#Percentage of toilets ----
+plot_percentage <- ggplot(data = type.of.toilet, aes(x = Interface.Layout, y = percentage, fill = Interface.Layout)) + 
+  geom_bar(stat = 'identity') +
+  theme_light() +
+  geom_text(aes(label=percentage), vjust=-0.3, size=3.5) +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank())+
+  labs(title = "Percentage of toilets' type", subtitle = "Kanyama", fill = "Toilet type", y = "Percentage")
+
+plot_percentage
+
+```
+
+###Toilets' counting
+
+Structure similar as the percentage but now showing the total ammount of toilets per type
+```{r toilet-counting}
+plot_count <- ggplot(data = Kanyama.plot, aes(x = Interface.Layout, fill = Interface.Layout))  + 
+  geom_histogram(stat = 'count') +
+  theme_light() +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
+  labs(title = "Quantity of toilets in Kanyama", subtitle = paste("Based on", nrow(Kanyama.plot), "plots"), fill = "Toilet type", y = "Number of toilets")
+
+plot_count
+```
+
+###Way to gather water
+
+1. Slices: Type of water fetch
+2. Type of chart: Pie
+
+```{r}
+type.of.water <- Kanyama.plot %>% group_by(Water.source..fetch.) %>% summarise(count = n())
+
+plot_water <- plot_ly(type.of.water, labels=~Water.source..fetch., values=~count, type = "pie") %>% 
+  layout(title = "Water Source in Kanyama",
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+plot_water
+
+
+```
+
+
+##Acessible Zones
+
+On the next group of chunks, it is represented which plots are acessible for each transport or people, where the red points indicates that the place is not safe or acessible and green dots indicates that the plot is acessible or safe.
+
+###Vacuum Tanker
+```{r VT}
+#Vacuum Tanker
+pal_bool <- colorFactor(c("red", "green"), domain = Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following...Vacuum.Tanker, na.color = "#000000")
+
+plot_Vacuum <- leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal_bool(Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following...Vacuum.Tanker), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                             pal = pal_bool, 
+                                                                             values = ~Is.the.toilet.easily.accessible.to.the.following...Vacuum.Tanker,
+                                                                             title = "Avaiable for the Vacuum Tanker", na.label = "Not Available")
+plot_Vacuum  
+
+
+```
+
+###Light Truck
+
+```{r LT}
+plot_Truck <-leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal_bool(Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following...Light.Truck), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                            pal = pal_bool, 
+                                                                            values = ~Is.the.toilet.easily.accessible.to.the.following...Light.Truck,
+                                                                            title = "Avaiable for the Light Truck", na.label = "Not Available")
+plot_Truck
+
+```
+
+###Push Cart
+```{r PS}
+
+plot_Cart <-leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal_bool(Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following...Push.Cart), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                            pal = pal_bool, 
+                                                                            values = ~Is.the.toilet.easily.accessible.to.the.following...Push.Cart,
+                                                                            title = "Avaiable for the Push Cart", na.label = "Not Available")
+plot_Cart
+
+```
+
+###Safe for children's use
+```{r child}
+
+plot_Children <-leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal_bool(Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following.people...Children), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                            pal = pal_bool, 
+                                                                            values = ~Is.the.toilet.easily.accessible.to.the.following.people...Children,
+                                                                            title = "Avaiable for Children", na.label = "Not Available")
+plot_Children
+
+```
+
+###Safe for womens at night
+
+```{r womens}
+
+plot_Women <-leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal_bool(Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following.people...Women.at.night), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                            pal = pal_bool, 
+                                                                            values = ~Is.the.toilet.easily.accessible.to.the.following.people...Women.at.night,
+                                                                            title = "Avaiable for women at night", na.label = "Not Available")
+plot_Women
+```
+
+###Safe for people with dissability
+
+```{r dis}
+
+plot_dis <-leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~pal_bool(Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following.people...Persons.with.dissability), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                            pal = pal_bool, 
+                                                                            values = ~Kanyama.valid$Is.the.toilet.easily.accessible.to.the.following.people...Persons.with.dissability,
+                                                                            title = "Avaiable for peopley with dissability", na.label = "Not Available")
+plot_dis
+
+
+```
+
+##People per plot
+
+In this plot, some places where removed because they are too far away from the Kanyama place. After that, the number of people where categorized into:
+
+1. Up to 5 people
+2. Up to 10 people
+3. Up to 20 people
+4. Up to 50 people
+5. More than 50 people
+
+Also, it was removed places that has no people living on their plots (e.g.: Churches, schools, Markets, etc.)
+
+```{r ppp}
+
+#People per plot (Average) ----
+filter_outside <- Kanyama.valid %>% filter(X1.9..longitude. < 28.275)
+
+filter_outside$fact_people_per_plot <- cut(filter_outside$People_on_the_plot, breaks = c(0,5,10, 20, 50, 50000),
+                                      labels = c("Up to 5 people","Up to 10 people", "Up to 20 people", "Up to 50 people", "More than 50 people" ) , include.lowest = T)
+
+people_per_plot <- filter_outside %>% filter(!is.na(People_on_the_plot))
+
+people_pal <- colorFactor("Spectral", domain = people_per_plot$fact_people_per_plot, na.color = "#000000")
+
+plot_avg_people <- leaflet(data = people_per_plot) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~people_pal(people_per_plot$fact_people_per_plot), label = ~Water.source..fetch.,
+                   radius = 5, opacity = 0.5, stroke = T) %>% addLegend("bottomright", 
+                                                                        pal = people_pal, 
+                                                                        values = ~fact_people_per_plot,
+                                                                        title = "Toilet per people", na.label = "Not Available")
+
+
+plot_avg_people
+
+```
+
+###People per toilet / Toilet per people
+
+On this plot, it was created new field that realtes people per toilet and toilet per people, removes the case where the number of people or toilets are 0 to avoid a division by zero.
+
+also the results were sliced in a similar way as the people per plot:
+
+People per toilet
+
+1. 1 person
+2. Up to 5 people
+3. Up to 20 people
+4. Up to 50 people
+5. Up to 100 people
+6. More than 100 people
+
+Toilet per people
+
+1. Up to 1 toilet
+2. Up to 2 toilets
+3. Up to 3 toilets
+4. More than 3 toilets
+
+
+```{r ppt-tpp}
+filter_outside <- filter_outside %>% mutate(people_per_toilet= case_when(Total.number.of.toilets.0. != 0 ~ people.using.toilet/Total.number.of.toilets.0.,
+                                                                         TRUE ~ 0))
+                                            
+filter_outside <- filter_outside %>% mutate(toilet_per_people= case_when(people.using.toilet != 0 ~ Total.number.of.toilets.0./people.using.toilet,
+                                                                         TRUE ~ 0))                                            
+
+filter_outside$fact_ppl_toilet <- cut(filter_outside$people_per_toilet, breaks = c(0,1,5, 10, 20, 50, 100,5000),
+                                      labels = c("1 person","Up to 5 people", "Up to 10 people", "Up to 20 people", "Up to 50 people","Up to 100 people", "More than 100 people" ) ,include.lowest = T)
+filter_outside$fact_toilet_ppl <- cut(filter_outside$toilet_per_people, breaks = c(0,1, 2, 3, 50),
+                                      labels = c("Up to 1 toilets","Up to 2 toilets", "Up to 3 toilets", "More than 3 toilets" ) , include.lowest = T)
+
+
+cont_pal <- colorFactor("Set1", domain = filter_outside$fact_toilet_ppl, na.color = "#000000" )
+cont_pal2 <- colorFactor("Set1", domain = filter_outside$fact_ppl_toilet, na.color = "#000000" )
+
+plot_toilet_ppl <- leaflet(data = filter_outside) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~cont_pal(filter_outside$fact_toilet_ppl), label = ~Water.source..fetch.,
+                   radius = 5, opacity = 0.5, stroke = T) %>% addLegend("bottomright", 
+                                                                             pal = cont_pal, 
+                                                                             values = ~fact_toilet_ppl,
+                                                                             title = "Toilet per people", na.label = "Not Available")
+
+
+plot_ppl_toilet <- leaflet(data = filter_outside) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude., 
+                   color = ~cont_pal2(filter_outside$fact_ppl_toilet), label = ~Water.source..fetch.,
+                   radius = 5, opacity = 0.5, stroke = T) %>% addLegend("bottomright", 
+                                                                        pal = cont_pal2, 
+                                                                        values = ~fact_ppl_toilet,
+                                                                        title = "People per toilet", na.label = "Not Available")
+plot_ppl_toilet
+plot_toilet_ppl
+
+```
+
+###Solid Waste disposal
+
+
+Structure:
+
+1. Slice: Type of solid waste disposal
+2. Type of chart: Pie
+```{r swd}
+
+#Solid Waste Disposal ----
+
+Waste.type <- Kanyama.plot %>% group_by(Where.do.you.dispose.your.solid.wastes.) %>% summarise(count = n())
+
+plot_waste <- plot_ly(Waste.type, labels = ~Where.do.you.dispose.your.solid.wastes., values =~count, type = "pie",
+                      insidetextfont = list(color = "#FFFFFF")) %>% 
+  layout(title = "Solid Waste Disposal in Kanyama",
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+plot_waste
+
+
+```
+
+###Landlord lives in the plot
+
+Structure:
+1. X axis: Landlord lives in the plot? (Yes or No)
+2. Y axis: Count of plots
+3. Fill: Landlord lives in the plot?
+4. Type of chart: Bar
+
+```{r}
+#Landlord live on the plot? ----
+Landlord <- Kanyama.plot %>% filter(!is.na(Landlord.live.in.the.plot.)) %>%  group_by(Landlord.live.in.the.plot.) %>% summarise(count = n())
+
+ggplot(data = Landlord, aes(x = Landlord.live.in.the.plot., y = count, fill = Landlord.live.in.the.plot.)) +
+  geom_bar(stat = "identity")+
+  geom_text(aes(label = count), vjust = -0.3) +
+  theme_bw() +
+  labs(title = "Landlord live in the plot?", subtitle = " Plots in Kanyama", x = element_blank(), y = element_blank(), fill = "Landlord live in the plot?") +
+  theme(panel.grid = element_blank()) +
+  coord_cartesian( ylim = c(0,10000))
+
+```
+
+
+### Fill level vs Landlord live in the plot
+
+Structure:
+
+1. X axis: Perception of the fill level
+2. Y axis: Count of plots
+3. Fill: Landlord Lives in the plot
+4. Type of chart: Histogram
+
+```{r qxl}
+plot_qualityxlandlord <- ggplot(data = Kanyama.plot,aes(x = Perception.of.the.fill.level, fill = Landlord.live.in.the.plot.) )+
+  geom_histogram() + theme_light() +
+  labs(x = "Perception of the fill level", y = "Number of toilets", fill = "Does the landlord live in the plot?")
+
+plot_qualityxlandlord
+```
+
+
+###Type of approach when the toilet goes full vs Landlord live in the plot
+
+Structure
+
+1. X axis: Count of toilets
+2. Y axis: Approach when the toilet goes full
+3. Fill: Landlord lives on the plot?
+4. Type of chart: Histogram
+
+```{r fullxl}
+
+plot_disposalxlandlord <- ggplot(data = filter(Kanyama.plot,!is.na(What.happens.when.the.toilet.gets.full.) & !is.na(Landlord.live.in.the.plot.) ), aes(x = What.happens.when.the.toilet.gets.full., fill = Landlord.live.in.the.plot.)) +
+  geom_histogram(stat = "count") + theme_light()+
+  labs(x = element_blank(), y = "Number of toilets", fill = "Does the landlord live in the plot?", title = "Full toilet Vs Landlord lives in the place") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  coord_flip()
+
+plot_disposalxlandlord
+```
+
+###Type of toilet x Landlord
+
+Structure:
+1. Y axis: Count of toilets
+2. X axis: Type of toilet
+3. Fill: Landlord lives in the plot?
+4. Type of Chart: Histogram
+
+```{r typexl}
+
+plot_typexlandlord <- ggplot(data = Kanyama.plot, aes(x = Interface.Layout, fill = Landlord.live.in.the.plot.)) +
+  geom_histogram(stat = "count") + coord_flip()
+
+plot_typexlandlord
+```
+
+###Time to empty x Landlord lives in the plot
+
+Structure:
+1. X axis: Landlord lives in the plot
+2. Y axis: Average time to empty the toilet 
+3. Fill: Landlord lives in the plot
+4. Type of chart: Bar
+
+```{r emptyxl}
+
+time.emptyxlandlord <- Kanyama.plot %>% filter (!is.na(Landlord.live.in.the.plot.) & !is.na(Toilet.emptying.time)) %>% 
+  group_by(Landlord.live.in.the.plot.) %>% summarise(avg.time = mean(as.numeric(as.character(Toilet.emptying.time)), na.rm = T))
+
+plot_time.emptyxlandlord <- ggplot(data = time.emptyxlandlord, aes(x = Landlord.live.in.the.plot., y = avg.time, fill = Landlord.live.in.the.plot.)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = avg.time), vjust = -.5) +
+  scale_y_continuous(limits = c(0,5)) +
+  theme_light()
+
+plot_time.emptyxlandlord
+
+
+```
+
+###Toilet approach when full
+
+Structure:
+1. Colour palletes: Aprroach when toilet goes full
+2. Label: Water fetch
+3. Type of chart: Map
+
+
+```{r Toilet reuse}
+
+#Toilet reuse ----
+
+
+pal_disposal <- colorFactor("Set1", domain = Kanyama.valid$What.happens.when.the.toilet.gets.full.)
+
+plot_disposal <- leaflet(data = Kanyama.valid) %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  addCircleMarkers(lng = ~X1.9..longitude.,
+                   lat = ~X1.9..latitude.,
+                   color = ~pal_disposal(Kanyama.valid$What.happens.when.the.toilet.gets.full.), label = ~Water.source..fetch.,
+                   radius = 1, fillOpacity = 0.3, stroke = T) %>% addLegend("bottomright", 
+                                                                            pal = pal_disposal, 
+                                                                            values = ~Kanyama.valid$What.happens.when.the.toilet.gets.full.,
+                                                                            title = "What happens when the toilet gets full?", na.label = "Not Available")
+plot_disposal
+```
+

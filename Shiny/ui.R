@@ -10,43 +10,9 @@ library(shinyjs)
 
 #shinyapps.io
 
-plot.time.series <- function(df, x.axis, y.axis, colour = "blue", colour.legend = "Legend: ", title = "Plot", method = geom_line){
-  
-  if(length(colour) == 1){
-    
-    plot <- ggplot(data = df, aes(x = x.axis)) + 
-      method(aes(y = y.axis ), colour = colour, se = F, method = "loess") +
-      labs(title= title, 
-           subtitle="Need of waste management team", 
-           y="Number of Occurrences",
-           colour = colour.legend) + 
-      theme_bw()+
-      scale_x_date(labels = date_format(format = "%b %Y"),breaks = "1 month") +
-      theme(axis.text.x = element_text(angle = 90, vjust=0.5),  # rotate x axis text
-            panel.grid.minor = element_blank(),
-            axis.title.x = element_blank(),
-            legend.position = "bottom")
-    
-  } else {
-    
-    plot <- ggplot(data = df, aes(x = x.axis)) + 
-      method(aes(y = y.axis , colour = colour), se = F, method = "loess") +
-      labs(title="2019 Time Series", 
-           subtitle="Need of waste management team", 
-           y="Number of Occurrences",
-           colour = colour.legend) + 
-      theme_bw()+
-      scale_x_date(labels = date_format(format = "%b %Y"),breaks = "1 month") +
-      theme(axis.text.x = element_text(angle = 90, vjust=0.5),  # rotate x axis text
-            panel.grid.minor = element_blank(),
-            axis.title.x = element_blank(),
-            legend.position = "bottom") 
-  }
-  # instead of returning the plot, save images in a folder
-  # ggsave
-  return(plot)
-  
-}
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/R")
+
+source("functions.R")
 # Read the data
 setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/Shiny")
 Kanyama <- read.csv("Shiny_plot.csv", stringsAsFactors = F)
@@ -95,6 +61,7 @@ pc.monthly <- type.transport.monthly %>% filter(Transport == "Push Cart")
 
 
 # Map part ----
+
 # Applied to the total, and any kind of transports needed
 # General points
 
@@ -138,8 +105,7 @@ ui <- navbarPage(title = "Predicted dates for Waste Collection in Kanyama", them
                        end = "2019-12",
                        format = "M-yyyy",
                        startview = "year"
-                       ),
-        actionBttn("change", label = "submit", size = "sm", style = "jelly")
+                       )
         ),
         
       mainPanel(
@@ -276,42 +242,59 @@ server <- function(input, output, session) {
   
   output$monthly <- renderPlot({
     
-    result <- sel()[[1]]
-    result$date.full <- as.Date(result$date.full)
-    result<- filter(result, year(result$date.full) == input$year.sel)
     
-    if(length(levels(factor(result$Transport))) == 3){
-      colour <- result$Transport
-    } else{
-      colour <- "Orange"
+    if(sel.month() == 0){
+      result <- sel()[[1]]
+      result$date.full <- as.Date(result$date.full)
+      result<- filter(result, year(result$date.full) == input$year.sel)
+      
+      if(length(levels(factor(result$Transport))) == 3){
+        colour <- result$Transport
+      } else{
+        colour <- "Orange"
+      }
+      p <- plot.time.series(result,
+                            result$date.full, result$number.of.cases, colour = colour, title = "Smooth time series plot", method = geom_smooth)
+      
+      p
+    } else {
+      result <- sel()[[2]]
+      result$date.full <- as.Date(result$date.full )
+      result<- filter(result, result$date.full > input$month.selection[1] & result$date.full < input$month.selection[2])
+      
+      if(length(levels(factor(result$Transport))) == 3){
+        colour <- result$Transport
+      } else{
+        colour <- "Orange"
+      }
+      p <- plot.time.series(result,
+                            result$date.full, result$number.of.cases, colour = colour, title = "Smooth time series plot")
+      
+      p
     }
-    
-    p <- plot.time.series(result,
-                          result$date.full, result$number.of.cases, colour = colour, title = "Smooth time series plot", method = geom_smooth)
-    
-    p
     
   })
   
   output$daily <- renderPlot({
     
-    result <- sel()[[2]]
-    result$date.full <- as.Date(result$date.full)
-    result<- filter(result, year(result$date.full) == input$year.sel)
-    
-    if(length(levels(factor(result$Transport))) == 3){
-      colour <- result$Transport
-    } else{
-      colour <- "Orange"
+    if(sel.month() == 0){
+      result <- sel()[[2]]
+      result$date.full <- as.Date(result$date.full)
+      result<- filter(result, year(result$date.full) == input$year.sel)
+      
+      if(length(levels(factor(result$Transport))) == 3){
+        colour <- result$Transport
+      } else{
+        colour <- "Orange"
+      }
+      
+      
+      p <- plot.time.series(result,
+                            result$date.full, result$number.of.cases, colour = colour, title = "Daily time series plot")
+      
+      p
+      
     }
-    
-    
-    p <- plot.time.series(result,
-                          result$date.full, result$number.of.cases, colour = colour, title = "Daily time series plot")
-    
-    p
-    
-    
   })
   
   output$map <- renderLeaflet({

@@ -4,48 +4,15 @@ library(readxl)
 library(leaflet)
 library(ggplot2)
 
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/R")
+
+source("functions.R")
+
 #Loading the reduced Dataset ---
-setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Data")
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/data")
 Kanyama <- read.csv("Kanyama_reduced.csv")
 
 #Function to remove by percentage of NA's
-
-Columns.Remover <- function(ds, percentage){
-  
-  
-  selection <- apply(ds, 2, function(x)  (sum( !is.na(x) ) / nrow(ds)) > percentage )
-  
-  return(selection)
-  
-}
-
-# Bathroom fill time preview based on:
-# Average human fecal waste per day = 0.000128 g
-# density similar to water
-
-Fill.time <- function(area, number.people, fill.level, flow.rate = 1.28e-4){
-  
-  fill.level <- case_when(fill.level == "Empty" ~ 0.0,
-                          fill.level == "Almost empty" ~ 0.25,
-                          fill.level == "Half-full" ~ 0.5,
-                          fill.level == "Almost full" ~ 0.75,
-                          fill.level == "Full" ~ 0.9,
-                          TRUE ~ 0.5)
-  
-  days.to.fill <- ((1  - fill.level) * area) / (number.people * flow.rate)
-  return( days.to.fill )
-  
-}
-
-
-Fill.date <- function(area, number.people, fill.level, interview.date){
-  
-  days.to.fill <- Fill.time(area, number.people, fill.level)
-  
-  return(days.to.fill + as.Date(interview.date))
-}
-
-
 
 Boolean.50 <- Columns.Remover(Kanyama, 0.5)
 Kanyama.50perc <- Kanyama[Boolean.50]

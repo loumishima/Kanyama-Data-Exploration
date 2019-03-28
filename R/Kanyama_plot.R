@@ -7,7 +7,11 @@ library(plotly)
 library(viridis)
 
 #Loading the reduced Dataset ----
-setwd("/Users/gather3/Documents/Github")
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/R")
+
+source("functions.R")
+
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/data")
 Kanyama.plot <- read.csv("Kanyama_to_plot.csv")
 
 Kanyama.valid <- Kanyama.plot %>% filter(!is.na(X1.9..latitude.) & !is.na(X1.9..longitude.)) %>% filter(X1.9..latitude. > -20)

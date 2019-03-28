@@ -4,7 +4,11 @@ library(readxl)
 library(leaflet)
 library(ggplot2)
 
-setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Data")
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/R")
+
+source("functions.R")
+
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/data")
 Kanyama.raw <- read_xlsx("KANYAMA.xlsx", sheet = 2, skip = 1)
 
 Kanyama <- Kanyama.raw %>% select(-c(1:23, 27)) %>% filter(.$`Are you willing to participate?` == "Yes")
@@ -41,14 +45,6 @@ Kanyama <- Kanyama %>% rename("Record_plot_number" = `1.3`,
 
 #!na/total ratio filtering ----
 
-Columns.Remover <- function(ds, percentage){
-  
-  
-  selection <- apply(ds, 2, function(x)  (sum( !is.na(x) ) / nrow(ds)) > percentage )
-  
-  return(selection)
-  
-}
 
 Boolean.50 <- Columns.Remover(Kanyama, 0.5)
 Kanyama.50perc <- Kanyama[Boolean.50]
@@ -75,98 +71,37 @@ write.csv(Deep.Learning, file = "Deep_Learning.csv" , row.names = F )
 #Removing the answers about the respondent and another columns with no use ----
 
 
-simplify <- function(df){
-  df.reduced <- df %>% 
-    select(-starts_with("DESCRIPTION OF RESPONDENT:"),
-           -starts_with("SELECT ZONE (Other"), 
-           -starts_with("SELECT ZONE SECTION (Other"),
-           -`RECORD TYPE OF PROPERTY (Other (please specify)) - specify`,
-           - `1.3 (Don't Know)`,
-           - `1.5 (Don't Know)`,
-           -`1.6.1 Do you think there is space on this plot to construct another toilet?: No - If Yes how many more? If No, why is that the case?`,
-           -`1.6.2 (Other (please specify)) - specify`,
-           -`1.7`,
-           -`1.7.1`,
-           -`2.1D`,
-           -`What is the designation of the respondent?`,
-           -`3.4 (Don't Know)`,
-           -starts_with("3.5"),
-           -starts_with("What do you want to upgrade your toilet"),
-           -starts_with("What happens when the toilet gets full? (Other"),
-           -ends_with("Months - Age"),
-           -`3.7 (Other (please specify)) - specify`,
-           -starts_with("3.7.1 ("),
-           -starts_with("How did you know about the service of emptying your toilet"),
-           -starts_with("How would you rate your level of satisfaction with the service you received from the emptiers?" ),
-           -starts_with("3.7.3"),
-           -starts_with("Was the fee you paid affordable? (" ),
-           -starts_with("How often do you empty your toilet? ("),
-           -starts_with("3.8"),
-           -starts_with("4.1"),
-           -starts_with("4.2"),
-           -starts_with("4.3 SLAB"),
-           -starts_with("4.3 INTERFACE ("),
-           -starts_with("CONTAINMENT/SUBSTRUCTURE ("),
-           -starts_with("Record the observed shape of the substructure/containment  ("),
-           -starts_with("TAKE PHOTO OF"),
-           -starts_with("TAKE  PHOTO OF"),
-           -starts_with("4.8 (Don't Know)")
-           
-    )
-  
-  if(any(df.reduced$`Is there another toilet to observe` == "No")){
-    
-    index <- grep("Is there another", colnames(df.reduced)) + 1
-    df.reduced <- select(df.reduced, -c(index:ncol(df.reduced)))
-  }
-  
-  return(df.reduced)
-}
 
 Kanyama.reduced <- simplify(Kanyama)
 
 #Grouping the last questions----
 
-grouping.columns <- function(df, column1, column2, name){
- 
-  res <- select(df, -starts_with(name)) 
-  mutate(res, !!name := case_when(
-    column1 == T ~ T,
-    column1 != T & column2 == T ~ F,
-    TRUE ~ NA))
-  
-}
 
-Kanyama.reduced <- grouping.columns(Kanyama.reduced,
-                 Kanyama.reduced$`Is the toilet easily accessible to the following people?: Children - Yes`,
-                 Kanyama.reduced$`Is the toilet easily accessible to the following people?: Children - No`,
-                 "Is the toilet easily accessible to the following people?: Children")
+columns_yes <- list(Kanyama.reduced$`Is the toilet easily accessible to the following people?: Children - Yes`,
+                    Kanyama.reduced$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes`,
+                    Kanyama.reduced$`Is the toilet easily accessible to the following people?: Women at night - Yes`,
+                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes`,
+                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Light Truck - Yes`,
+                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Push Cart - Yes`)
 
-Kanyama.reduced <- grouping.columns(Kanyama.reduced,
-                                Kanyama.reduced$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes`, 
-                                Kanyama.reduced$`Is the toilet easily accessible to the following people?: Persons with dissability - No`,
-                                "Is the toilet easily accessible to the following people?: Persons with dissability")
+columns_no <- list(Kanyama.reduced$`Is the toilet easily accessible to the following people?: Children - No`,
+                   Kanyama.reduced$`Is the toilet easily accessible to the following people?: Persons with dissability - No`,
+                   Kanyama.reduced$`Is the toilet easily accessible to the following people?: Women at night - No`,
+                   Kanyama.reduced$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No`,
+                   Kanyama.reduced$`Is the toilet easily accessible to the following?: Light Truck - No`,
+                   Kanyama.reduced$`Is the toilet easily accessible to the following?: Push Cart - No`)
 
-Kanyama.reduced <- grouping.columns(Kanyama.reduced,
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following people?: Women at night - Yes`, 
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following people?: Women at night - No`,
-                                    "Is the toilet easily accessible to the following people?: Women at night")
 
-Kanyama.reduced <- grouping.columns(Kanyama.reduced,
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes`, 
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No`,
-                                    "Is the toilet easily accessible to the following?: Vacuum Tanker")
+names <- c("Is the toilet easily accessible to the following people?: Children",
+           "Is the toilet easily accessible to the following people?: Persons with dissability",
+           "Is the toilet easily accessible to the following people?: Women at night",
+           "Is the toilet easily accessible to the following?: Vacuum Tanker",
+           "Is the toilet easily accessible to the following?: Light Truck",
+           "Is the toilet easily accessible to the following?: Push Cart")
 
-Kanyama.reduced <- grouping.columns(Kanyama.reduced,
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Light Truck - Yes` , 
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Light Truck - No`,
-                                    "Is the toilet easily accessible to the following?: Light Truck")
 
-Kanyama.reduced <- grouping.columns(Kanyama.reduced,
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Push Cart - Yes`, 
-                                    Kanyama.reduced$`Is the toilet easily accessible to the following?: Push Cart - No`,
-                                    "Is the toilet easily accessible to the following?: Push Cart")
 
+Kanyama.reduced <- grouping.columns(Kanyama.reduced, columns_yes, columns_no, names)
 
 Kanyama.reduced <- select(Kanyama.reduced, -`Is there another toilet to observe`)
 
@@ -186,36 +121,24 @@ test1 <- more.than.1.toilet[, 1:55]
 test2 <- more.than.1.toilet[,87:117]
 test3 <- cbind(test1,test2)
 
-test3 <- grouping.columns(test3,
-                                    test3$`Is the toilet easily accessible to the following people?: Children - Yes61`,
-                                    test3$`Is the toilet easily accessible to the following people?: Children - No62`,
-                                    "Is the toilet easily accessible to the following people?: Children")
 
-test3 <- grouping.columns(test3,
-                                    test3$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes59`, 
-                                    test3$`Is the toilet easily accessible to the following people?: Persons with dissability - No60`,
-                                    "Is the toilet easily accessible to the following people?: Persons with dissability")
+columns_yes <- list(test3$`Is the toilet easily accessible to the following people?: Children - Yes`,
+                    test3$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes`,
+                    test3$`Is the toilet easily accessible to the following people?: Women at night - Yes`,
+                    test3$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes`,
+                    test3$`Is the toilet easily accessible to the following?: Light Truck - Yes`,
+                    test3$`Is the toilet easily accessible to the following?: Push Cart - Yes`)
 
-test3 <- grouping.columns(test3,
-                                    test3$`Is the toilet easily accessible to the following people?: Women at night - Yes63`, 
-                                    test3$`Is the toilet easily accessible to the following people?: Women at night - No64`,
-                                    "Is the toilet easily accessible to the following people?: Women at night")
+columns_no <- list(test3$`Is the toilet easily accessible to the following people?: Children - No`,
+                   test3$`Is the toilet easily accessible to the following people?: Persons with dissability - No`,
+                   test3$`Is the toilet easily accessible to the following people?: Women at night - No`,
+                   test3$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No`,
+                   test3$`Is the toilet easily accessible to the following?: Light Truck - No`,
+                   test3$`Is the toilet easily accessible to the following?: Push Cart - No`)
 
-test3 <- grouping.columns(test3,
-                                    test3$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes53`, 
-                                    test3$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No54`,
-                                    "Is the toilet easily accessible to the following?: Vacuum Tanker")
-
-test3 <- grouping.columns(test3,
-                                    test3$`Is the toilet easily accessible to the following?: Light Truck - Yes55` , 
-                                    test3$`Is the toilet easily accessible to the following?: Light Truck - No56`,
-                                    "Is the toilet easily accessible to the following?: Light Truck")
-
-test3 <- grouping.columns(test3,
-                                    test3$`Is the toilet easily accessible to the following?: Push Cart - Yes57`, 
-                                    test3$`Is the toilet easily accessible to the following?: Push Cart - No58`,
-                                    "Is the toilet easily accessible to the following?: Push Cart")
+test3 <- grouping.columns(test3, columns_yes, columns_no, names)
 rm(test1,test2)
+
 test3 <- select(test3, -`Is there a third toilet to observe`)
 
 more.than.2.toilet <- simplify(more.than.2.toilet)
@@ -224,35 +147,22 @@ test4 <- more.than.2.toilet[,118:ncol(more.than.2.toilet)]
 test5 <- more.than.2.toilet[,1:55]
 test6 <- cbind(test5,test4)
 
-test6 <- grouping.columns(test6,
-                          test6$`Is the toilet easily accessible to the following people?: Children - Yes109`,
-                          test6$`Is the toilet easily accessible to the following people?: Children - No110`,
-                          "Is the toilet easily accessible to the following people?: Children")
+columns_yes <- list(test6$`Is the toilet easily accessible to the following people?: Children - Yes`,
+                    test6$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes`,
+                    test6$`Is the toilet easily accessible to the following people?: Women at night - Yes`,
+                    test6$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes`,
+                    test6$`Is the toilet easily accessible to the following?: Light Truck - Yes`,
+                    test6$`Is the toilet easily accessible to the following?: Push Cart - Yes`)
 
-test6 <- grouping.columns(test6,
-                          test6$`Is the toilet easily accessible to the following people?: Persons with dissability - Yes107`, 
-                          test6$`Is the toilet easily accessible to the following people?: Persons with dissability - No108`,
-                          "Is the toilet easily accessible to the following people?: Persons with dissability")
+columns_no <- list(test6$`Is the toilet easily accessible to the following people?: Children - No`,
+                   test6$`Is the toilet easily accessible to the following people?: Persons with dissability - No`,
+                   test6$`Is the toilet easily accessible to the following people?: Women at night - No`,
+                   test6$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No`,
+                   test6$`Is the toilet easily accessible to the following?: Light Truck - No`,
+                   test6$`Is the toilet easily accessible to the following?: Push Cart - No`)
 
-test6 <- grouping.columns(test6,
-                          test6$`Is the toilet easily accessible to the following people?: Women at night - Yes111`, 
-                          test6$`Is the toilet easily accessible to the following people?: Women at night - No112`,
-                          "Is the toilet easily accessible to the following people?: Women at night")
+test6 <- grouping.columns(test6, columns_yes, columns_no, names)
 
-test6 <- grouping.columns(test6,
-                          test6$`Is the toilet easily accessible to the following?: Vacuum Tanker  - Yes101`, 
-                          test6$`Is the toilet easily accessible to the following?: Vacuum Tanker  - No102`,
-                          "Is the toilet easily accessible to the following?: Vacuum Tanker")
-
-test6 <- grouping.columns(test6,
-                          test6$`Is the toilet easily accessible to the following?: Light Truck - Yes103` , 
-                          test6$`Is the toilet easily accessible to the following?: Light Truck - No104`,
-                          "Is the toilet easily accessible to the following?: Light Truck")
-
-test6 <- grouping.columns(test6,
-                          test6$`Is the toilet easily accessible to the following?: Push Cart - Yes105`, 
-                          test6$`Is the toilet easily accessible to the following?: Push Cart - No106`,
-                          "Is the toilet easily accessible to the following?: Push Cart")
 rm(test4,test5)
 
 

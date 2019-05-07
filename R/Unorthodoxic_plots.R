@@ -6,7 +6,7 @@ library(lubridate)
 library(scales)
 
 # Loading the organized Dataset ---
-setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Data")
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration/data")
 Kanyama <- read.csv("Kanyama_organized.csv", stringsAsFactors = F)
 
 
@@ -63,6 +63,7 @@ plot.time.series <- function(df, x.axis, y.axis, colour = "blue", colour.legend 
 P.Availability <- Kanyama %>% select(DATE.OF.INTERVIEW,
                                      X1.9..latitude.,
                                      X1.9..longitude.,
+                                     X1.9..altitude.,
                                      area.m3, 
                                      Perception.of.the.fill.level, 
                                      people.using.toilet, 
@@ -82,6 +83,7 @@ P.Availability <- P.Availability %>%
                                  TRUE ~ "Push Cart") ) %>%
   select(-contains("Is.the.toilet"))
 
+setwd("/Users/gather3/Documents/Kanyama - Data Exploration/Kanyama Data Exploration")
 write.csv(P.Availability, file = "Shiny/Shiny_plot.csv")
 
 # Plot ( All cases combined ) ----

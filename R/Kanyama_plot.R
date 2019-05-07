@@ -240,7 +240,7 @@ ggplot(data = Landlord, aes(x = Landlord.live.in.the.plot., y = count, fill = La
 #Landlord living x Quality of the toilet ----
 
 plot_qualityxlandlord <- ggplot(data = Kanyama.plot,aes(x = Perception.of.the.fill.level, fill = Landlord.live.in.the.plot.) )+
-  geom_histogram() + theme_light() +
+  geom_histogram(stat="count") + theme_light() +
   labs(x = "Perception of the fill level", y = "Number of toilets", fill = "Does the landlord live in the plot?")
 
 plot_qualityxlandlord

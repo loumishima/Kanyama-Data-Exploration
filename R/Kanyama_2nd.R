@@ -34,9 +34,9 @@ Kanyama <- Kanyama %>% select(-c(Are.you.willing.to.participate.,
                                   How.did.you.finance.for.the.upgrades.,
                                   How.did.you.finance.for.the.upgrades...Other..please.specify.....specify,
                                   X3.7.2..Other..please.specify.....specify,
-                                  Condition.of.the.components..Roof...Score.Condition,
-                                  Condition.of.the.components..Wall...Score.Condition,
-                                  Condition.of.the.components..Floor...Score.Condition,
+                                  #Condition.of.the.components..Roof...Score.Condition,
+                                  #Condition.of.the.components..Wall...Score.Condition,
+                                  #Condition.of.the.components..Floor...Score.Condition,
                                   DATE.OF.INTERVIEW..Time.Answered.
                                   ))
 
@@ -63,6 +63,11 @@ Kanyama <- Kanyama %>% mutate(Perception.of.the.fill.level =
                                           Perception.of.the.fill.level == "3" ~ "Half-full",
                                           Perception.of.the.fill.level == "4" ~ "Almost empty",
                                           Perception.of.the.fill.level == "5" ~ "Empty",
+                                          TRUE ~ NA_character_))
+
+Kanyama <- Kanyama %>% mutate(Cleanliness.rate =
+                                case_when(Cleanliness.rate == "1" | Cleanliness.rate == "2" ~ "Clean",
+                                          Cleanliness.rate == "3" | Cleanliness.rate == "4" ~ "Dirty",
                                           TRUE ~ NA_character_))
 
 # Adding the substructure area:
@@ -139,7 +144,13 @@ Kanyama_essential <- Kanyama %>% select(c(
   CONTAINMENT.SUBSTRUCTURE,
   Record.the.observed.shape.of.the.substructure.containment.,
   Width:Height,
-  Perception.of.the.fill.level:Is.the.toilet.easily.accessible.to.the.following...Push.Cart
+  Perception.of.the.fill.level:Is.the.toilet.easily.accessible.to.the.following...Push.Cart,
+  Condition.of.the.components..Roof...Score.Condition,
+  Condition.of.the.components..Wall...Score.Condition,
+  Condition.of.the.components..Floor...Score.Condition,
+  Condition.of.the.components..Interface...Score.Condition,
+  Condition.of.the.components..Substructure.Containment....Score.Condition
+  
 ))
 
 write.csv(Kanyama, file = "Kanyama_organized.csv", row.names = F)

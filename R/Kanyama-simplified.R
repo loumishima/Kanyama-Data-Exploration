@@ -40,7 +40,8 @@ Kanyama <- Kanyama %>% rename("Record_plot_number" = `1.3`,
                                   "Is washing hand basin present?" = `4.9`,
                                   "Region" = `1.2`,
                                   "Landlord live in the plot?" = `1.8`,
-                                  "Upgraded toilet recently?" = `3.4`
+                                  "Upgraded toilet recently?" = `3.4`,
+                                  "Cleanliness rate" = `4.117`
                                   )
 
 #!na/total ratio filtering ----

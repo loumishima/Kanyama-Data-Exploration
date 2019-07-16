@@ -27,22 +27,38 @@ This application is avaiable at [Gatherhub platform](https://gatherhub.shinyapps
 
 ## User Interface
 
-The "Number of Occurences" tab shows, indicates how many toilets are going to be full on a daily basis, from the day the toilets were last emptied, until the day that they are supposed to be full, according to the calculation. The time-span are by default annual, with a day-by-day(Raw) and monthly (Smooth) aggregation. Enabling the month selection make the time-span flexible according to the user preference, but only the day-by-day analysis is disponible on this mode. Also, using the "Transport" sub-tab shows the places that have the respective properties:
+The "Number of Occurences" tab shows, indicates how many toilets are going to be full on a daily basis, from the day the toilets were last emptied, until the day that they are supposed to be full, according to the calculation. The time-span are by default annual, with a day-by-day(Raw) and monthly (Smooth) aggregation. 
+
+Monthly and Daily Predictions:
+
+![Default panel](data/print3.png)
+
+Enabling the month selection make the time-span flexible according to the user preference, but only the day-by-day analysis is disponible on this mode. 
+
+General tab with Monhth selection activated:
+
+![General Option](data/print4.png)
+
+Accessing the "Transport" sub-tab shows the places that have the respective properties:
 
 1. Vacuum Tanker: Access Available by the Vacuum Tanker
 2. Light Truck: Access unavailable by the Vacuum Tanker but available by the Light Truck
 3. Push Cart: Access unavailable both by the Light Truck and the Vacuum Tanker
-***
-** ADD IMAGE HERE **
-***
+
+Transport tab with Monhth selection activated:
+
+![General Option](data/print5.png)
+
+Transport tab:
+
+![Transport Option](data/print2.png)
+
 The "Amount of Waste" tab works on a similar way, but instead counting toilets this section takes into consideration the containment size on each plot and indicates how many cubic meters has to be collected on each day into the future, making easier for the waste management team to organise its collection approach.
-***
-** ADD IMAGE HERE ** 
-***
+
 The "Map" tab is responsible to transform the "Number of Occurence"/"Amount of Waste" tabs into a geospatial visualisation, indicating what are the points to be collected and where are the full toilets, The map is zoom sensitive making possible the plots update according to the amount of points on the map.
-***
-** ADD IMAGE HERE **
-***
+
+![Map Option](data/print1.png)
+
 
 ## Next Steps
 

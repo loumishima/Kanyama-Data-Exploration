@@ -181,3 +181,12 @@ in_bounding_box <- function(data, lat, long, bounds) {
   
   return(data)
 }
+
+HTML_labels <-function(id,attribute){
+  labels <- sprintf(
+    "<strong>%s</strong><br/>%g people / mi<sup>2</sup>",
+    id, attribute
+  ) %>% lapply(htmltools::HTML)
+  
+  return(labels)
+}

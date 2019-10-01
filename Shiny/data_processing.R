@@ -105,7 +105,7 @@ Volume.pc.monthly <- Volume.type.transport.month %>% filter(Transport == "Push C
 # Applied to the total, and any kind of transports needed
 # General points
 
-Map.Kanyama <- Kanyama %>% select(X1.9..latitude., X1.9..longitude.,X1.9..altitude., date.full, Transport, area.m3) %>% 
+Map.Kanyama <- Kanyama %>% dplyr::select(X1.9..latitude., X1.9..longitude.,X1.9..altitude., date.full, Transport, area.m3) %>% 
   filter(!is.na(X1.9..altitude.) & X1.9..latitude. > -16 & X1.9..longitude. > 28 & X1.9..altitude. > 0 ) %>% 
   mutate(kind = case_when(area.m3 == 4.5 ~ "Pit Latrine",
                           area.m3 == 12.5 ~ "Septic Tank"))
@@ -148,3 +148,4 @@ values <-c("All together" = "all",
 names.occ <- c("soft.plot", "time.plot", "monthly", "daily")
 
 names.m3 <- c("m3.soft", "m3.raw", "m3.monthly", "m3.daily")
+

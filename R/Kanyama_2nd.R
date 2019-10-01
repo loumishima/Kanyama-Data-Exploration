@@ -70,6 +70,13 @@ Kanyama <- Kanyama %>% mutate(Cleanliness.rate =
                                           Cleanliness.rate == "3" | Cleanliness.rate == "4" ~ "Dirty",
                                           TRUE ~ NA_character_))
 
+Kanyama <- Kanyama %>% mutate(Last.time.emptied = as.numeric(as.character(Last.time.emptied)),
+                              Last.time.emptied =
+                                case_when(Last.time.emptied < 3 ~ Last.time.emptied * 30,
+                                          Last.time.emptied > 3 & Last.time.emptied < 6 ~ (Last.time.emptied + 1) * 30,
+                                          Last.time.emptied > 6 ~ 12 * 30,
+                                          TRUE ~ NA_real_))
+
 # Adding the substructure area:
 
 # Pit latrine = 4.5 m^3
@@ -139,7 +146,7 @@ Kanyama_essential <- Kanyama %>% select(c(
   Where.do.you.dispose.your.solid.wastes.,
   starts_with("Age.of.toilet"),
   What.happens.when.the.toilet.gets.full.,
-  Toilet.emptying.time,
+  Last.time.emptied,
   Interface.Layout,
   CONTAINMENT.SUBSTRUCTURE,
   Record.the.observed.shape.of.the.substructure.containment.,

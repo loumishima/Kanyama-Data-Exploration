@@ -1,0 +1,10 @@
+name: Kanyama_prediction
+title: Kanyama Predicted dates for waste management
+username:
+account: gatherhub
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1268226
+bundleId: 2458513
+url: https://gatherhub.shinyapps.io/Kanyama_prediction/
+when: 1569927050.30818
